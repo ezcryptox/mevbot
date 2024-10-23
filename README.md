@@ -73,8 +73,6 @@ The bot relies on several environment variables for configuration. Below is an e
 - `GAS_LIMIT`: The gas limit to be used in transactions (default: `200000`).
 - `MAX_FEE_PER_GAS`: The maximum gas fee in gwei (default: `100`).
 - `MAX_PRIORITY_FEE_PER_GAS`: The maximum priority fee in gwei (default: `2`).
-- `SLIPPAGE_TOLERANCE`: Tolerance for slippage in trades.
-- `ARBITRAGE_THRESHOLDS`: Profit thresholds for arbitrage, defined as JSON for each coin.
 - `WEBHOOK_URL`: An optional webhook URL for sending alerts on profitable trades.
 - `MAX_BUY_PERCENTAGE`: The maximum percentage of the wallet balance to use in a trade (default: 50%).
 - `BASE_BUY_PERCENTAGE`: The base percentage of the wallet balance to use in normal arbitrage trades (default: 10%).

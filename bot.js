@@ -3,7 +3,6 @@ const { ethers, toBigInt, parseUnits, parseEther, formatEther, MaxUint256, Contr
 const axios = require('axios');
 const winston = require('winston');
 const mongoose = require('mongoose');
-// const { FlashbotsBundleProvider } = require('@flashbots/ethers-provider-bundle');
 const { MevShareClient } = require('@flashbots/mev-share-client');
 const { Mutex } = require('async-mutex');
 const abiDecoder = require('abi-decoder');
@@ -400,10 +399,6 @@ class MEVBot {
     } else {
       this.provider = new ethers.JsonRpcProvider(`https://mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`);
       this.wallet = new ethers.Wallet(process.env.WALLET_PK, this.provider);
-      // if (!process.env.FLASHBOTS_RELAY_KEY) {
-      //   throw new Error('FLASHBOTS_RELAY_KEY is not set in environment variables');
-      // }
-      // this.FLASHBOTS_RELAY_SIGNING_KEY = new ethers.Wallet(process.env.FLASHBOTS_RELAY_KEY);
     }
 
 
