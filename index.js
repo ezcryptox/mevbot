@@ -1,5 +1,5 @@
 const express = require('express');
-const MEVBot = require('./bot'); // Assuming MEVBot is exported from bot.js
+const MEVBot = require('./bot.js'); // Assuming MEVBot is exported from bot.js
 
 const app = express();
 const port = process.env.PORT || 3000;

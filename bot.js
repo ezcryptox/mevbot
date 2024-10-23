@@ -1,22 +1,37 @@
 require('dotenv').config();
-const { ethers, toBigInt, parseUnits, parseEther, formatEther, MaxUint256, Contract, Wallet, ZeroAddress } = require('ethers');
+const { ethers, toBigInt, parseUnits, parseEther, formatEther, MaxUint256, Contract, Wallet, ZeroAddress, getAddress } = require('ethers');
 const axios = require('axios');
 const winston = require('winston');
 const mongoose = require('mongoose');
 // const { FlashbotsBundleProvider } = require('@flashbots/ethers-provider-bundle');
 const { MevShareClient } = require('@flashbots/mev-share-client');
 const { Mutex } = require('async-mutex');
-
+const abiDecoder = require('abi-decoder');
 
 // Constants
-const MONITORED_COINS = ['ETH', 'BTC'];
+const MONITORED_PAIRS = [[{
+  coin: 'ETH', // WETH
+  address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+}, {
+  coin: 'AAVE',
+  address: getAddress('0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9')
+}
+], [{
+  coin: 'ETH',
+  address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+}, {
+  coin: 'DAI',
+  address: getAddress('0x6B175474E89094C44Da98b954EedeAC495271d0F')
+}]];
 
-const SLIPPAGE_TOLERANCE = { ETH: 1, BTC: 1 };
-const ARBITRAGE_THRESHOLDS = { ETH: 0.1, BTC: 0.05 };
+const SLIPPAGE_TOLERANCE = { ETH: 1, AAVE: 1 };
+const ARBITRAGE_THRESHOLDS = { ETH: 0.1, AAVE: 0.05 };
 
 
-
-const LARGE_TRADE_THRESHOLDS = { ETH: 2, BTC: 0.3 };
+const ERC20_ABI = [
+  "function name() view returns (string)"
+];
+const LARGE_TRADE_THRESHOLDS = { ETH: 2, AAVE: 0.3 };
 // Router ABI for Uniswap/Sushiswap
 const DEX_ABI = [
   {
@@ -165,6 +180,7 @@ const DEX_ABI = [
     "type": "function"
   }
 ];
+abiDecoder.addABI(DEX_ABI);
 const FACTORY_ABI = ['function getPair(address tokenA, address tokenB) external view returns (address pair)'];
 const PAIR_ABI = ['function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)'];
 const BOT_STRATEGIES = ['ARBITRAGE', 'FRONT_RUNNING', 'BACK_RUNNING', 'SANDWICH'];
@@ -173,24 +189,14 @@ const BOT_STRATEGIES = ['ARBITRAGE', 'FRONT_RUNNING', 'BACK_RUNNING', 'SANDWICH'
 const DEXs = {
   UNISWAP: {
     name: 'Uniswap',
-    factoryAddress: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
+    factoryAddress: getAddress('0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f'),
     routerAddress: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
-    assets: {
-      ETH: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
-      USDC: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-      BTC: '0x...Your BTC Token Address...' //TODO Replace with actual BTC token address on Ethereum
-    },
     tradingFeePercentage: 0.3
   },
   SUSHISWAP: {
     name: 'Sushiswap',
-    factoryAddress: '0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac',
-    routerAddress: '0xd9e1CE17f2641f24aE83637ab66a2cca9C378B9F',
-    assets: {
-      ETH: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
-      USDC: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-      BTC: '0x...Your BTC Token Address...' //TODO Replace with actual BTC token address on Ethereum
-    },
+    factoryAddress: '0xC0AEe478e3658e2610c5F7A4A2E1777Ce9e4f2Ac',
+    routerAddress: getAddress('0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f'),
     tradingFeePercentage: 0.3
   }
 };
@@ -325,14 +331,56 @@ function gasLimitConfig() {
       maxPriorityFeePerGas: parseUnits('1', 'gwei'),
     };
   }
-  
+
   return {
     gasLimit: BigInt(parseInt(process.env.GAS_LIMIT || '200000')), // Adjust gas limit as needed
     maxFeePerGas: parseUnits(process.env.MAX_FEE_PER_GAS || '100', 'gwei'), // Adjust as needed
     maxPriorityFeePerGas: parseUnits(process.env.MAX_PRIORITY_FEE_PER_GAS || '2', 'gwei') // Adjust as needed
   }
-  
+
 }
+function isMonitoredTx(tx) {
+  // Decode the transaction data
+  const decodedData = abiDecoder.decodeMethod(tx.data);
+
+  if (!decodedData) return false;
+
+  // Extract the method name and parameters
+  const methodName = decodedData.name;
+
+  if (methodName.toLowerCase() !== 'swapexacttokensfortokens') return { monitored: false }// We only care about token swaps
+
+
+  
+  const params = decodedData.params;
+
+  // Identify the tokens involved based on the method parameters
+  let tokenAddresses = [];
+  params.forEach(param => {
+    if (param.name === 'path' || param.name === 'token') {
+      tokenAddresses = tokenAddresses.concat(param.value);
+    }
+  });
+
+  tokenAddresses = [...new Set(tokenAddresses.map(addr => addr.toLowerCase()))];
+
+
+
+  const pairs = MONITORED_PAIRS.map(p => p).flat();
+  // Filter based on the monitored coin/token
+  const monitoredAddress = pairs.map(c => c.address.toLowerCase());
+
+  return {
+    monitored: tokenAddresses.some(addr => monitoredAddress.find(m => m === addr)),
+    pair: tokenAddresses.filter(t => monitoredAddress.includes(t)).map(t => ({
+      address: t,
+      coin: pairs.find(p => p.address.toLowerCase() === t)?.coin || ''
+    }))
+  }
+
+}
+
+
 
 class MEVBot {
   constructor() {
@@ -357,8 +405,8 @@ class MEVBot {
       // }
       // this.FLASHBOTS_RELAY_SIGNING_KEY = new ethers.Wallet(process.env.FLASHBOTS_RELAY_KEY);
     }
-   
-   
+
+
     // this.flashbotsProvider = null;
     this.mevShareClient = null;
 
@@ -376,7 +424,10 @@ class MEVBot {
       ),
       transports: [
         new winston.transports.File({ filename: 'error.log', level: 'error' }),
-        new winston.transports.File({ filename: 'combined.log' })
+        new winston.transports.File({ filename: 'combined.log' }),
+        new winston.transports.Console({
+          format: winston.format.simple()
+        })
       ]
     });
 
@@ -386,7 +437,7 @@ class MEVBot {
       }));
     }
 
-    
+
   }
 
   async initialize() {
@@ -399,24 +450,6 @@ class MEVBot {
       // Use one of Hardhat's default accounts
       const hardhatAccounts = await this.provider.listAccounts();
       this.wallet = this.provider.getSigner(hardhatAccounts[0].address);
-      // this.flashbotsProvider = {
-      //   sendBundle: async (bundle, targetBlockNumber) => {
-      //     // Directly send transactions for testing
-      //     const txResponses = [];
-      //     for (const tx of bundle) {
-      //       const txResponse = await tx.signer.sendTransaction(tx.transaction);
-      //       txResponses.push(txResponse);
-      //     }
-      //     return {
-      //       wait: async () => {
-      //         for (const txResponse of txResponses) {
-      //           await txResponse.wait();
-      //         }
-      //         return 0; // Simulate inclusion in block
-      //       },
-      //     };
-      //   },
-      // };
 
       // Mocking mevShareClient for testing
       this.mevShareClient = {
@@ -435,11 +468,6 @@ class MEVBot {
     } else {
       this.wallet = new ethers.Wallet(process.env.WALLET_PK, this.provider);
       try {
-        this.flashbotsProvider = await FlashbotsBundleProvider.create(
-          this.provider,
-          this.FLASHBOTS_RELAY_SIGNING_KEY,
-          'https://relay.flashbots.net'
-        );
         this.mevShareClient = new MevShareClient(this.provider);
         this.logger.info('MEV Bot initialized successfully');
       } catch (error) {
@@ -447,7 +475,22 @@ class MEVBot {
         throw error;
       }
     }
-    
+
+  }
+
+  async tokenNamesFromAddress(tokenAddresses) {
+    const tokenNames = {};
+
+    await Promise.all(tokenAddresses.map(async (tokenAddress) => {
+      try {
+        const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, this.provider);
+        const tokenName = await tokenContract.name();
+        tokenNames[tokenAddress] = tokenName;
+      } catch (error) {
+        this.logger.error(`Failed to get name for token at address ${tokenAddress}:`, error);
+      }
+    }));
+    return tokenNames;
   }
 
   async run() {
@@ -467,7 +510,7 @@ class MEVBot {
               const opportunities = await this.findArbitrageOpportunities();
               if (opportunities.length > 0) {
                 await this.executeArbitrage(opportunities);
-              }
+              } else this.logger.info('No Arbitrage Opportunity Found!')
               break;
             case 'FRONT_RUNNING':
               await this.executeFrontRunning();
@@ -570,7 +613,8 @@ class MEVBot {
 
   async findArbitrageOpportunities() {
     const opportunities = [];
-    for (const coin of MONITORED_COINS) {
+    for (const pair of MONITORED_PAIRS) {
+      const coin = pair[0].coin;
       const threshold = ARBITRAGE_THRESHOLDS[coin] || 0.1;
       const dexPrices = {};
 
@@ -578,7 +622,7 @@ class MEVBot {
       await Promise.all(Object.keys(DEXs).map(async (dexKey) => {
         const dex = DEXs[dexKey];
         try {
-          const price = await this.getPriceFromDEX(dex.routerAddress, dex.assets['ETH'], dex.assets['USDC']);
+          const price = await this.getPriceFromDEX(dex.routerAddress, pair[0].address, pair[1].address);
           dexPrices[dex.name] = price;
         } catch (error) {
           this.logger.error(`Error fetching price from ${dex.name} for ${coin}:`, error);
@@ -596,6 +640,7 @@ class MEVBot {
             opportunities.push({
               strategy: 'ARBITRAGE',
               coin,
+              pair,
               buy: dex2,
               sell: dex1,
               profitPotential: parseEther((price1 - price2 * (1 + threshold)).toString())
@@ -604,6 +649,7 @@ class MEVBot {
             opportunities.push({
               strategy: 'ARBITRAGE',
               coin,
+              pair,
               buy: dex1,
               sell: dex2,
               profitPotential: parseEther((price2 - price1 * (1 + threshold)).toString())
@@ -615,60 +661,6 @@ class MEVBot {
     return opportunities;
   }
 
-  // Advanced Arbitrage: Multi-hop Arbitrage Detection
-  async findArbitrageOpportunities_ADV() {
-    const opportunities = [];
-    for (const coin of MONITORED_COINS) {
-      const threshold = ARBITRAGE_THRESHOLDS[coin] || 0.1;
-      const dexPrices = {};
-      for (const dexKey in DEXs) {
-        const dex = DEXs[dexKey];
-        try {
-          // Example: Multi-hop from ETH -> USDC -> DAI
-          const price = await this.getMultiHopPriceFromDEX(dex.routerAddress, DEXs[dexKey].assets['ETH'], DEXs[dexKey].assets['DAI']);
-          dexPrices[dex.name] = price;
-        } catch (error) {
-          this.logger.error(`Error fetching multi-hop price from ${dex.name} for ${coin}:`, error);
-        }
-      }
-
-      const dexNames = Object.keys(dexPrices);
-      for (let i = 0; i < dexNames.length; i++) {
-        for (let j = i + 1; j < dexNames.length; j++) {
-          const dex1 = dexNames[i];
-          const dex2 = dexNames[j];
-          const price1 = dexPrices[dex1];
-          const price2 = dexPrices[dex2];
-          if (price1 > price2 * (1 + threshold)) {
-            opportunities.push({
-              strategy: 'ARBITRAGE',
-              coin,
-              buyDex: dex2,
-              sellDex: dex1,
-              profitPotential: parseEther((price1 - price2 * (1 + threshold)).toString())
-            });
-          } else if (price2 > price1 * (1 + threshold)) {
-            opportunities.push({
-              strategy: 'ARBITRAGE',
-              coin,
-              buyDex: dex1,
-              sellDex: dex2,
-              profitPotential: parseEther((price2 - price1 * (1 + threshold)).toString())
-            });
-          }
-        }
-      }
-    }
-    return opportunities;
-  }
-
-  async getMultiHopPriceFromDEX(routerAddress, tokenIn, tokenOut) {
-    const router = new ethers.Contract(routerAddress, DEX_ABI, this.provider);
-    // Define a multi-hop path, e.g., ETH -> USDC -> DAI
-    const path = [tokenIn, DEXs['UNISWAP'].assets['USDC'], tokenOut];
-    const amounts = await router.getAmountsOut(parseEther('1'), path);
-    return parseFloat(formatEther(amounts[2])); // Assuming tokenOut is the third token
-  }
 
   // Price Feed Integration: Validate arbitrage opportunities using external price feeds
   async validateArbitrageOpportunity(opportunity) {
@@ -678,7 +670,7 @@ class MEVBot {
       price: Joi.number().required()
     });
 
-    const { coin, sellDex, buyDex } = opportunity;
+    const { coin, pair, sellDex, buyDex } = opportunity;
 
     try {
       const response = await axios.get(`https://api.coingecko.com/api/v3/simple/price?ids=${coin.toLowerCase()}&vs_currencies=usd`);
@@ -692,7 +684,7 @@ class MEVBot {
       }
 
       // Compare external price with DEX price to validate opportunity
-      const dexPrice = await this.getPriceFromDEX(DEXs[buyDex].routerAddress, DEXs[buyDex].assets['ETH'], DEXs[buyDex].assets['USDC']);
+      const dexPrice = await this.getPriceFromDEX(DEXs[buyDex].routerAddress, pair[0].address, pair[1].address);
       return dexPrice * (1 + ARBITRAGE_THRESHOLDS[coin]) < externalPrice;
     } catch (error) {
       this.logger.error('Error validating arbitrage opportunity:', error);
@@ -702,7 +694,9 @@ class MEVBot {
 
   async getPriceFromDEX(routerAddress, tokenIn, tokenOut) {
     const router = new ethers.Contract(routerAddress, DEX_ABI, this.provider);
+    this.logger.info(`${routerAddress} :::> Getting Amounts for ${parseEther('1') }, => ${tokenIn} : ${tokenOut}`, )
     const amounts = await router.getAmountsOut(parseEther('1'), [tokenIn, tokenOut]);
+    this.logger.info(`Amounts => ${amounts}`)
     return parseFloat(formatEther(amounts[1]));
   }
 
@@ -734,7 +728,7 @@ class MEVBot {
 
 
   async estimateTradeMetrics(opportunity) {
-    const { buy, sell, coin } = opportunity;
+    const { buy, sell, coin, pair } = opportunity;
     const buyDex = DEXs[buy];
     const sellDex = DEXs[sell];
 
@@ -761,7 +755,7 @@ class MEVBot {
     const buyRouter = new ethers.Contract(buyDex.routerAddress, DEX_ABI, this.wallet);
     const buyTx = await buyRouter.populateTransaction.swapExactETHForTokens(
       0, // Set amountOutMin to 0 for estimation
-      [buyDex.assets['ETH'], buyDex.assets[coin]],
+      [pair[1].address, pair[0].address],
       this.wallet.address,
       Math.floor(Date.now() / 1000) + 60 * 20, // 20 minutes deadline
       {
@@ -777,7 +771,7 @@ class MEVBot {
     const sellTx = await sellRouter.populateTransaction.swapExactTokensForETH(
       amountIn,
       0, // Set amountOutMin to 0 for estimation
-      [sellDex.assets[coin], sellDex.assets['ETH']],
+      [pair[0].address, pair[1].address],
       this.wallet.address,
       Math.floor(Date.now() / 1000) + 60 * 20, // 20 minutes deadline
     );
@@ -794,7 +788,7 @@ class MEVBot {
   }
 
   async executeArbitrageTrade(opportunity, profitability) {
-    const { buy, sell, coin, profitPotential } = opportunity;
+    const { buy, sell, coin, profitPotential, pair } = opportunity;
     this.logger.info(`Executing arbitrage: Buy ${coin} on ${buy}, Sell on ${sell}. Potential Profit: ${formatEther(profitPotential)} ETH`);
     const { amountIn } = profitability.metrics;
     const buyDex = DEXs[buy];
@@ -803,16 +797,16 @@ class MEVBot {
     const buyRouter = new ethers.Contract(buyDex.routerAddress, DEX_ABI, this.wallet);
     const sellRouter = new ethers.Contract(sellDex.routerAddress, DEX_ABI, this.wallet);
 
-    const amountsOut = await buyRouter.getAmountsOut(amountIn, [buyDex.assets['ETH'], buyDex.assets[coin]]);
-    const amountOutMin = amountsOut[1] * BigInt(100 - SLIPPAGE_TOLERANCE[coin]) / 100;
+    const amountsOut = await buyRouter.getAmountsOut(amountIn, [pair[0].address, pair[1].address]);
+    const amountOutMin = amountsOut[0] * BigInt(100 - SLIPPAGE_TOLERANCE[coin]) / 100;
 
     // Approve token if necessary
-    await this.checkAndApproveToken(buyDex.assets['coin'], buyDex.routerAddress, amountsOut[1]);
+    await this.checkAndApproveToken(pair[1].address, buyDex.routerAddress, amountsOut[1]);
 
     // Prepare buy transaction
     const buyTx = await buyRouter.populateTransaction.swapExactETHForTokens(
       amountOutMin,
-      [buyDex.assets['ETH'], buyDex.assets[coin]],
+      [pair[1].address, pair[0].address],
       this.wallet.address,
       Math.floor(Date.now() / 1000) + 60 * 20, // 20 minutes deadline
       {
@@ -821,17 +815,17 @@ class MEVBot {
       }
     );
 
-    const sellAmount = amountsOut[1]; // Assuming full amount is sold
+    const sellAmount = amountsOut[0]; // Assuming full amount is sold
     const sellAmountMin = sellAmount * BigInt(100 - SLIPPAGE_TOLERANCE[coin]) / 100;
 
     // Approve token if necessary
-    await this.checkAndApproveToken(sellDex.assets[coin], sellDex.routerAddress, sellAmount);
+    await this.checkAndApproveToken(pair[0].address, sellDex.routerAddress, sellAmount);
 
     // Prepare sell transaction
     const sellTx = await sellRouter.populateTransaction.swapExactTokensForETH(
       sellAmount,
       sellAmountMin,
-      [sellDex.assets[coin], sellDex.assets['ETH']],
+      [pair[0].address, pair[1].address],
       this.wallet.address,
       Math.floor(Date.now() / 1000) + 60 * 20, // 20 minutes deadline
       gasLimitConfig()
@@ -842,24 +836,6 @@ class MEVBot {
 
 
     await this.simulateAndExecuteBundle(bundle);
-
-    // const blockNumber = await this.provider.getBlockNumber();
-    // const response = await this.flashbotsProvider.sendBundle(bundle, blockNumber + 1);
-
-    // if ('error' in response) {
-    //   this.logger.error(`Flashbots Error: ${response.error.message}`);
-    //   throw new Error(response.error.message);
-    // }
-
-    // const bundleResolution = await response.wait();
-
-    // if (bundleResolution === 0) {
-    //   this.logger.info(`Arbitrage executed successfully: Bought ${coin} on ${buy}, Sold on ${sell}`);
-    // } else if (bundleResolution === 1) {
-    //   this.logger.warn('Bundle not included in block');
-    // } else {
-    //   this.logger.warn('Bundle pending or unknown');
-    // }
   }
 
   async executeSandwich() {
@@ -900,15 +876,13 @@ class MEVBot {
 
         for (const dexKey in DEXs) {
           const dex = DEXs[dexKey];
-
-          for (const coin in dex.assets) {
-            if (tx.to.toLowerCase() === dex.assets[coin].toLowerCase()) {
-              const tradeValue = parseFloat(formatEther(tx.value));
-              if (tradeValue > (LARGE_TRADE_THRESHOLDS[coin] || 1)) {
-                this.logger.info(`Identified large trade for sandwiching on ${dex.name} for ${coin}: ${tradeValue} ${coin}`);
-                targetTxs.push({ tx, dex, coin, tradeValue, originalTx: tx });
-              }
-            }
+          const { monitored, pair } = isMonitoredTx(tx).monitored;
+          if (tx.to.toLowerCase() !== dex.routerAddress.toLowerCase() || !monitored) continue; //
+          const quote = pair[1].name;
+          const tradeValue = parseFloat(formatEther(tx.value));
+          if (tradeValue > (LARGE_TRADE_THRESHOLDS[quote] || 1)) {
+            this.logger.info(`Identified large trade for sandwiching on ${dex.name} for ${quote}: ${tradeValue} ${quote}`);
+            targetTxs.push({ tx, dex, pair, tradeValue, originalTx: tx });
           }
         }
       }));
@@ -922,22 +896,23 @@ class MEVBot {
   }
 
   async createFrontTx(targetTx) {
-    const { tx, dex, coin, tradeValue } = targetTx;
+    const { tx, dex, pair, tradeValue } = targetTx;
+    const quote = pair[1].coin;
 
     const buyDex = dex;
 
     const router = new ethers.Contract(buyDex.routerAddress, DEX_ABI, this.wallet);
 
     const amountIn = parseEther(tradeValue.toString());
-    const amountsOut = await router.getAmountsOut(amountIn, [buyDex.assets['ETH'], buyDex.assets[coin]]);
-    const amountOutMin = amountsOut[1] * BigInt(100 - SLIPPAGE_TOLERANCE[coin]) / 100;
+    const amountsOut = await router.getAmountsOut(amountIn, [pair[0].address, pair[1].address]);
+    const amountOutMin = amountsOut[1] * BigInt(100 - (SLIPPAGE_TOLERANCE[quote] || 0)) / 100;
 
     // Approve token if necessary
-    await this.checkAndApproveToken(buyDex.assets[coin], buyDex.routerAddress, amountsOut[1]);
+    await this.checkAndApproveToken(pair[1].address, buyDex.routerAddress, amountsOut[1]);
 
     const frontTxData = await router.populateTransaction.swapExactETHForTokens(
       amountOutMin,
-      [buyDex.assets['ETH'], buyDex.assets[coin]],
+      [pair[0].address, pair[1].address],
       this.wallet.address,
       Math.floor(Date.now() / 1000) + 60 * 20, // 20 minutes deadline
       {
@@ -950,24 +925,24 @@ class MEVBot {
   }
 
   async createBackTx(targetTx) {
-    const { dex, coin } = targetTx;
+    const { dex, pair } = targetTx;
 
     const sellDex = dex;
 
     const router = new ethers.Contract(sellDex.routerAddress, DEX_ABI, this.wallet);
 
-    
+
 
     const sellAmount = parseEther('1'); // TODO Adjust amount
-    const sellAmountMin = sellAmount * BigInt(100 - SLIPPAGE_TOLERANCE[coin])/ 100;
+    const sellAmountMin = sellAmount * BigInt(100 - SLIPPAGE_TOLERANCE[pair[0].coin]) / 100;
 
     // Approve token if necessary
-    await this.checkAndApproveToken(sellDex.assets[coin], sellDex.routerAddress, sellAmount);
+    await this.checkAndApproveToken(pair[1].coin, sellDex.routerAddress, sellAmount);
 
     const backTxData = await router.populateTransaction.swapExactTokensForETH(
       sellAmount,
       sellAmountMin,
-      [sellDex.assets[coin], sellDex.assets['ETH']],
+      [pair[1].address, pair[0].address],
       this.wallet.address,
       Math.floor(Date.now() / 1000) + 60 * 20, // 20 minutes deadline
       gasLimitConfig()
@@ -1025,70 +1000,38 @@ class MEVBot {
     }
   }
 
-  // async simulateAndExecuteBundle(bundle) {
-  //   try {
-  //     const blockNumber = await this.provider.getBlockNumber();
-  //     const simulation = await this.flashbotsProvider.simulate(
-  //       bundle.map(tx => tx.transaction),
-  //       blockNumber + 1
-  //     );
-
-  //     if ('error' in simulation) {
-  //       this.logger.error(`Simulation Error: ${simulation.error.message}`);
-  //       return;
-  //     }
-
-  //     this.logger.info('Simulation successful, sending bundle...');
-
-  //     const response = await this.flashbotsProvider.sendBundle(bundle, blockNumber + 1);
-
-  //     if ('error' in response) {
-  //       this.logger.error(`Flashbots Error: ${response.error.message}`);
-  //       return;
-  //     }
-
-  //     const bundleResolution = await response.wait();
-
-  //     if (bundleResolution === 0) {
-  //       this.logger.info('Bundle included in block');
-  //     } else if (bundleResolution === 1) {
-  //       this.logger.warn('Bundle not included in block');
-  //     } else {
-  //       this.logger.warn('Bundle pending or unknown');
-  //     }
-  //   } catch (error) {
-  //     this.logger.error('Error during bundle simulation/execution:', error);
-  //   }
-  // }
-
   // Identify front-running opportunities based on swap size, slippage, and gas price
   async isFrontRunningOpportunity(tx) {
-    this.logger.info('Checking op on tx...');
+    const { monitored, pair } = isMonitoredTx(tx);
+    if (!monitored) {
+      this.logger.info(`Not monitoring TX `, pair, tx.data);
+      return null;
+    }
+    this.logger.info('Front Running Opp pairs => ', pair)
     for (const dexKey in DEXs) {
       const dex = DEXs[dexKey];
+      if (tx.to.toLowerCase() !== dex.routerAddress.toLowerCase()) continue; // 
+      const tradeValue = parseFloat(formatEther(tx.value));
 
-      for (const coin in dex.assets) {
-        if (tx.to && tx.to.toLowerCase() === dex.assets[coin].toLowerCase()) {
-          const tradeValue = parseFloat(formatEther(tx.value));
+      const base = pair[0].coin;
 
-          // Front-running criteria:
-          // 1. Large trade value above threshold
-          // 2. Slippage tolerance higher than expected, indicating opportunity
-          // 3. Gas price not too high to compete
-          const slippage = this.extractSlippage(tx.data);
-          const feeData = await this.provider.getFeeData();
-          const gasPrice = feeData.maxPriorityFeePerGas || parseUnits('2', 'gwei');
+      // Front-running criteria:
+      // 1. Large trade value above threshold
+      // 2. Slippage tolerance higher than expected, indicating opportunity
+      // 3. Gas price not too high to compete
+      const slippage = this.extractSlippage(tx.data);
+      const feeData = await this.provider.getFeeData();
+      const gasPrice = feeData.maxPriorityFeePerGas || parseUnits('2', 'gwei');
 
-          if (
-            tradeValue > (LARGE_TRADE_THRESHOLDS[coin] || 1) &&
-            slippage > 1 &&
-            gasPrice > parseUnits('200', 'gwei')
-          ) {
-            this.logger.info(`Identified front-running opportunity on ${dex.name} for ${coin}: ${tradeValue} ${coin}`);
-            return { dex, coin };
-          }
-        }
+      if (
+        tradeValue > (LARGE_TRADE_THRESHOLDS[base] || 1) &&
+        slippage > 1 &&
+        gasPrice > parseUnits('200', 'gwei')
+      ) {
+        this.logger.info(`Identified front-running opportunity on ${dex.name} for ${base}: ${tradeValue} ${base}`);
+        return { dex, pair };
       }
+      break;
     }
 
     return null;
@@ -1116,36 +1059,39 @@ class MEVBot {
 
   // Identify back-running opportunities by checking liquidity pool impact and price impact recovery
   async isBackRunningOpportunity(tx) {
+    const { monitored, pair } = isMonitoredTx(tx);
+    if (!monitored) {
+      this.logger.info(`Not monitoring TX `, pair, tx.data);
+      return;
+    }
     for (const dexKey in DEXs) {
       const dex = DEXs[dexKey];
+      if (tx.to.toLowerCase() !== dex.routerAddress.toLowerCase()) continue; // 
+      const quote = pair[1].coin;
+      const tradeValue = parseFloat(formatEther(tx.value));
 
-      for (const coin in dex.assets) {
-        if (tx.to && tx.to.toLowerCase() === dex.assets[coin].toLowerCase()) {
-          const tradeValue = parseFloat(formatEther(tx.value));
+      // Back-running criteria:
+      // 1. Large trade size impacting liquidity
+      // 2. Slippage tolerance that suggests price impact
+      // 3. Expectation that the price will recover after the impact
+      const reserves = await this.getLiquidityPoolReserves(dex, pair);
+      const priceImpact = this.calculatePriceImpact(tradeValue, reserves);
 
-          // Back-running criteria:
-          // 1. Large trade size impacting liquidity
-          // 2. Slippage tolerance that suggests price impact
-          // 3. Expectation that the price will recover after the impact
-          const reserves = await this.getLiquidityPoolReserves(dex, coin);
-          const priceImpact = this.calculatePriceImpact(tradeValue, reserves);
-
-          if (tradeValue > (LARGE_TRADE_THRESHOLDS[coin] || 1) && priceImpact > 5) {
-            this.logger.info(`Identified back-running opportunity on ${dex.name} for ${coin}: ${tradeValue} ${coin}`);
-            return { dex, coin };
-          }
-        }
+      if (tradeValue > (LARGE_TRADE_THRESHOLDS[quote] || 1) && priceImpact > 5) {
+        this.logger.info(`Identified back-running opportunity on ${dex.name} for ${quote}: ${tradeValue} ${quote}`);
+        return { dex, pair };
       }
+      break;
     }
 
     return null;
   }
 
   // Fetch reserves from the liquidity pool to measure impact
-  async getLiquidityPoolReserves(dex, coin) {
-    const pairAddress = await this.getPairAddress(dex.factoryAddress, dex.assets['ETH'], dex.assets[coin]);
+  async getLiquidityPoolReserves(dex, pair) {
+    const pairAddress = await this.getPairAddress(dex.factoryAddress, pair[0].address, pair[1].address);
     if (pairAddress === ZeroAddress) {
-      throw new Error(`No pair found for ETH and ${coin} on ${dex.name}`);
+      throw new Error(`No pair found for ${pair[0].coin} and ${pair[1].coin} on ${dex.name}`);
     }
     const pairContract = new ethers.Contract(pairAddress, PAIR_ABI, this.provider);
     const reserves = await pairContract.getReserves();
@@ -1167,10 +1113,12 @@ class MEVBot {
     try {
       const pendingBlock = await this.provider.send('eth_getBlockByNumber', ['pending', false]);
 
-      if (!pendingBlock || !pendingBlock.transactions) {
+      if (!pendingBlock || !pendingBlock.transactions.length) {
         this.logger.info('No pending transactions found for front-running');
         return;
       }
+
+      this.logger.info(`Found ${pendingBlock.transactions.length} pending transactions`)
 
       const promises = pendingBlock.transactions.map(async (txHash) => {
         const tx = await this.provider.getTransaction(txHash);
@@ -1181,10 +1129,10 @@ class MEVBot {
         if (frontRunOpportunity) {
           this.logger.info('Found front-running opportunity!');
 
-          const { dex, coin } = frontRunOpportunity;
+          const { dex, pair } = frontRunOpportunity;
 
           // Create the front-running transaction
-          const frontTx = await this.createFrontTx({ tx, dex, coin, tradeValue: parseFloat(formatEther(tx.value)) });
+          const frontTx = await this.createFrontTx({ tx, dex, pair, tradeValue: parseFloat(formatEther(tx.value)) });
 
           // Send the front-running transaction using Flashbots
           await this.simulateAndExecuteBundle([frontTx]);
@@ -1205,10 +1153,12 @@ class MEVBot {
     try {
       const pendingBlock = await this.provider.send('eth_getBlockByNumber', ['pending', false]);
 
-      if (!pendingBlock || !pendingBlock.transactions) {
+      if (!pendingBlock || !pendingBlock.transactions.length) {
         this.logger.info('No pending transactions found for back-running');
         return;
       }
+
+      this.logger.info(`Found ${pendingBlock.transactions.length} pending transactions`)
 
       const promises = pendingBlock.transactions.map(async (txHash) => {
         const tx = await this.provider.getTransaction(txHash);
@@ -1219,10 +1169,10 @@ class MEVBot {
         if (backRunOpportunity) {
           this.logger.info('Found back-running opportunity!');
 
-          const { dex, coin } = backRunOpportunity;
+          const { dex, pair } = backRunOpportunity;
 
           // Create the back-running transaction
-          const backTx = await this.createBackTx({ tx, dex, coin, tradeValue: parseFloat(formatEther(tx.value)) });
+          const backTx = await this.createBackTx({ tx, dex, pair, tradeValue: parseFloat(formatEther(tx.value)) });
 
           // Send the back-running transaction using Flashbots
           await this.simulateAndExecuteBundle([backTx]);
