@@ -1,8 +1,8 @@
 const hre = require("hardhat");
 
 async function main() {
-  await hre.network.provider.send("evm_setIntervalMining", [3000]); // Mine every 3 seconds
-  console.log("Mining interval set to 3 seconds");
+  await hre.network.provider.send("evm_setIntervalMining", [10000]); // Mine every 3 seconds
+  console.log("Mining interval set to 10 seconds");
 }
 
 main()

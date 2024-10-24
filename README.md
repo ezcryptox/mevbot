@@ -254,7 +254,7 @@ await network.provider.send("hardhat_setNextBlockBaseFeePerGas", [
 Once you've set up the desired conditions, you can start the bot in test mode:
 
 ```bash
-NODE_ENV=test node bot.js
+NODE_ENV=test node index.js
 ```
 
 The bot should detect these scenarios and execute the corresponding strategies (arbitrage, front-running, etc.).
