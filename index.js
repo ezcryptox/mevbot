@@ -14,7 +14,7 @@ app.get('/', (req, res) => {
 // Route to get the current state of the bot
 app.get('/bot/state', (req, res) => {
   const state = bot.stateManager.getState();
-  res.json(state);
+  res.json({...state, totalProfit: state.totalProfit.toLocaleString()});
 });
 
 // Start the server

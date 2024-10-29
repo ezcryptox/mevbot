@@ -50,6 +50,8 @@ Before setting up and running the bot, ensure you have the following:
     BASE_BUY_PERCENTAGE=10  # Base percentage of wallet balance to use in arbitrage (default 10%)
     HIGH_PROFIT_THRESHOLD=0.5  # High profit threshold in ETH (default 0.5 ETH)
     PROFIT_MULTIPLIER=1.5  # Multiplier for high-profit scenarios (default 1.5x)
+
+    COINGECKO_API_KEY=<Your_API_key> # For fetching updated prices
     ```
 
 ## Usage
@@ -78,6 +80,7 @@ The bot relies on several environment variables for configuration. Below is an e
 - `BASE_BUY_PERCENTAGE`: The base percentage of the wallet balance to use in normal arbitrage trades (default: 10%).
 - `HIGH_PROFIT_THRESHOLD`: The minimum profit threshold for "high profit" opportunities in ETH (default: 0.5 ETH).
 - `PROFIT_MULTIPLIER`: A multiplier applied to `BASE_BUY_PERCENTAGE` for high-profit scenarios (default: 1.5x).
+- `COINGECKO_API_KEY`: CoinGecko api For fetching updated prices
 
 
 ### Adding More Monitored Pairs

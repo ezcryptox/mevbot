@@ -3,7 +3,7 @@ const { ethers, toBigInt, parseUnits, parseEther, formatEther, MaxUint256, Contr
 const axios = require('axios');
 const winston = require('winston');
 const mongoose = require('mongoose');
-const { MevShareClient } = require('@flashbots/mev-share-client');
+const MevShareClient =  require("@flashbots/mev-share-client")
 const { Mutex } = require('async-mutex');
 const abiDecoder = require('abi-decoder');
 
@@ -439,32 +439,17 @@ class MEVBot {
       // Use one of Hardhat's default accounts
       const hardhatAccounts = await this.provider.listAccounts();
       this.wallet = this.provider.getSigner(hardhatAccounts[0].address);
-
-      // Mocking mevShareClient for testing
-      this.mevShareClient = {
-        sendTransaction: async (signedTx) => {
-          // Simulate sending a transaction
-          console.log('Mock sendTransaction called with:', signedTx);
-          return { error: null }; // Simulate successful send
-        },
-        simulateTransaction: async (signedTx) => {
-          // Simulate transaction simulation
-          console.log('Mock simulateTransaction called with:', signedTx);
-          return { error: null }; // Simulate successful simulation
-        }
-      };
-      this.logger.info('MEV Bot initialized successfully');
     } else {
       this.wallet = new ethers.Wallet(process.env.WALLET_PK, this.provider);
-      try {
-        this.mevShareClient = new MevShareClient(this.provider);
-        this.logger.info('MEV Bot initialized successfully');
-      } catch (error) {
-        this.logger.error('Failed to initialize MEV Bot:', error);
-        throw error;
-      }
     }
 
+    try {
+      this.mevShareClient = MevShareClient.default.useEthereumMainnet(this.wallet);
+      this.logger.info('MEV Bot initialized successfully');
+    } catch (error) {
+      this.logger.error('Failed to initialize MEV Bot:', error);
+      throw error;
+    }
   }
 
   async getBalance(tokenAddress) {
@@ -581,6 +566,19 @@ class MEVBot {
     };
   }
 
+  async calculateProfitabilityForOtherStrategies(opportunity) {
+    const { tradeValue, slippage, exchangeFees } = opportunity;
+    const gasCost = await this.estimateGasCost(opportunity);
+
+    const netProfit = tradeValue - gasCost - exchangeFees;
+    const profitRatio = !gasCost ? 0 : (netProfit * parseUnits('1', '18') / gasCost) / 1e18;
+
+    return {
+      isProfit: netProfit > 0 && profitRatio > 1.5, // Adjust thresholds as needed
+      metrics: { netProfit, profitRatio, gasCost, slippage, exchangeFees }
+    };
+  }
+
   async calculateSlippage(path, amount, dex) {
     const reserves = await this.getPathReserves(path, dex);
     const impact = amount / reserves[0];
@@ -668,9 +666,13 @@ class MEVBot {
 
     // this.logger.info('Opportunity => ', opportunity)
     // return true;
-
+    const ep = `https://api.coingecko.com/api/v3/simple/price?ids=${pair[1].coin.toLowerCase()}&vs_currencies=${pair[0].coin.toLowerCase()}`;
+    const headers = {
+      'Authorization': `Bearer ${process.env.COINGECKO_API_KEY}`
+    };
     try {
-      const response = await axios.get(`https://api.coingecko.com/api/v3/simple/price?ids=${pair[1].coin.toLowerCase()}&vs_currencies=${pair[0].coin.toLowerCase()}`);
+      
+      const response = await axios.get(ep, { headers });
       const { [pair[0].coin.toLowerCase()]: externalPrice } = response.data[pair[1].coin.toLowerCase()];
       if (!externalPrice) throw new Error('Invalid price data');
 
@@ -678,7 +680,7 @@ class MEVBot {
       const dexPrice = await this.getPriceFromDEX(DEXs[buyDex].routerAddress, pair[1].address, pair[0].address);
       return dexPrice * (1 + ARBITRAGE_THRESHOLDS[pair[1].coin.toLowerCase()]) < externalPrice;
     } catch (error) {
-      this.logger.error('Error validating arbitrage opportunity:');
+      this.logger.error(`Error validating arbitrage opportunity: ERROR MESSAGE =>"${error.message}" for endpoint :::> ${ep}`);
       return true;
     }
   }
