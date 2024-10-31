@@ -668,7 +668,7 @@ class MEVBot {
     // return true;
     const ep = `https://api.coingecko.com/api/v3/simple/price?ids=${pair[1].coin.toLowerCase()}&vs_currencies=${pair[0].coin.toLowerCase()}`;
     const headers = {
-      'Authorization': `Bearer ${process.env.COINGECKO_API_KEY}`
+      // 'Authorization': `Bearer ${process.env.COINGECKO_API_KEY}`
     };
     try {
       
