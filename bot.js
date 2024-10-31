@@ -532,6 +532,7 @@ class MEVBot {
     }
   }
 
+
   async calculateOptimalGas(tx) {
     const feeData = await this.provider.getFeeData();
 
@@ -540,7 +541,6 @@ class MEVBot {
       : parseUnits('100', 'gwei'); // Fallback
 
     const maxPriorityFeePerGas = parseUnits('2', 'gwei');
-
     const gasLimit = await this.provider.estimateGas(tx);
 
     return {
