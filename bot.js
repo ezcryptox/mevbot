@@ -420,11 +420,13 @@ class MEVBot {
       ]
     });
 
-    if (process.env.NODE_ENV !== 'production') {
-      this.logger.add(new winston.transports.Console({
-        format: winston.format.simple()
-      }));
-    }
+    this.logger.add(new winston.transports.Console({
+      format: winston.format.simple()
+    }));
+
+    // if (process.env.NODE_ENV !== 'production') {
+      
+    // }
 
 
   }
