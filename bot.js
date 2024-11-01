@@ -352,7 +352,7 @@ function isMonitoredTx(tx) {
 
   console.log('TX Method > ', decodedData.name);
 
-  if (methodName.toLowerCase() !== 'swapexacttokensfortokens') return undefined// We only care about token swaps
+  if (methodName.toLowerCase() !== 'swapexacttokensfortokens' && methodName.toLowerCase() !== 'swapexactethfortokens') return undefined// We only care about token swaps
 
   console.log(`Found  '${methodName}' method`);
 
