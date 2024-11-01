@@ -1104,10 +1104,14 @@ class MEVBot {
   async isFrontRunningOpportunity(tx) {
     const monitored = isMonitoredTx(tx);
     if (!monitored) {
-      this.logger.info(`Not monitoring TX `, tx.data);
+      this.logger.info(`Not monitoring TX `);
       return null;
     }
     const { pair } = monitored;
+    if (!pair) {
+      this.logger.info(`Not monitoring COIN PAIR:::> ${tx.data}`);
+      return null;
+    }
 
     const base = pair[0].coin;
     const tradeValue = parseFloat(formatEther(tx.value));
@@ -1180,7 +1184,7 @@ class MEVBot {
     }
     const {pair, isBuy} = monitored;
     if (!pair || isBuy ) {
-      this.logger.info(`Not monitoring TX `, pair);
+      this.logger.info(`Not monitoring COIN PAIR `, pair);
       return;
     }
     const quote = pair[1].coin;
