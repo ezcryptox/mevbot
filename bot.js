@@ -349,6 +349,8 @@ function isMonitoredTx(tx) {
   // Extract the method name and parameters
   const methodName = decodedData.name;
 
+  this.logger.info(`TX Data>: ${decodedData}`)
+
   if (methodName.toLowerCase() !== 'swapexacttokensfortokens') return undefined// We only care about token swaps
 
 
@@ -458,7 +460,7 @@ class MEVBot {
     try {
       const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, this.provider);
       const [balance, decimals] = await Promise.all([tokenContract.balanceOf(this.wallet.address), tokenContract.decimals()]);
-      return formatUnits(balance, decimals);
+      return parseFloat(formatUnits(balance, decimals));
     } catch (error) {
       return 0
     }
@@ -733,11 +735,13 @@ class MEVBot {
 
     // Calculate amountIn based on available balance and potential profit
     const balance = await this.getBalance(pair[0].address);
-    if (!balance) return {amountIn: 0}
-    const maxPercentage = parseInt(process.env.MAX_BUY_PERCENTAGE || '50'); // Maximum percentage of balance to use
-    const basePercentage = parseInt(process.env.BASE_BUY_PERCENTAGE || '10');
+    if (!balance) return { amountIn: 0 }
+    
+    this.logger.info(`ETH BALANCE: ${balance}`)
+    const maxPercentage = parseFloat(process.env.MAX_BUY_PERCENTAGE || '50'); // Maximum percentage of balance to use
+    const basePercentage = parseFloat(process.env.BASE_BUY_PERCENTAGE || '10');
     const highProfitThreshold = parseEther(`${process.env.HIGH_PROFIT_THRESHOLD || 0.5}`);
-    const profitMultiplier = parseInt(process.env.PROFIT_MULTIPLIER || '1.5'); // Multiplier for high profit scenarios
+    const profitMultiplier = parseFloat(process.env.PROFIT_MULTIPLIER || '1.5'); // Multiplier for high profit scenarios
 
     let percentageToUse = basePercentage;
 
@@ -762,7 +766,7 @@ class MEVBot {
       }
     );
     const buyGasEstimate = await this.provider.estimateGas(buyTx);
-    const buyGasCost = buyGasEstimate.mul(gasPrice);
+    const buyGasCost = buyGasEstimate * gasPrice;
 
     // Simulating sell transaction to estimate gas cost
     const sellRouter = new ethers.Contract(sellDex.routerAddress, DEX_ABI, this.wallet);
@@ -774,7 +778,7 @@ class MEVBot {
       Math.floor(Date.now() / 1000) + 60 * 20, // 20 minutes deadline
     );
     const sellGasEstimate = await this.provider.estimateGas(sellTx);
-    const sellGasCost = sellGasEstimate.mul(gasPrice);
+    const sellGasCost = sellGasEstimate * gasPrice;
 
     const gasCost = buyGasCost.add(sellGasCost);
     const slippage = SLIPPAGE_TOLERANCE[opportunity.coin] || 1;
@@ -782,7 +786,7 @@ class MEVBot {
     const flashbotsBribe = parseUnits('0.005', 'ether'); // Flashbots bribe estimation
 
     const potentialProfit = opportunity.profitPotential;
-    return { gasCost, slippage, exchangeFees, potentialProfit: potentialProfit.sub(flashbotsBribe), amountIn };
+    return { gasCost, slippage, exchangeFees, potentialProfit: potentialProfit - flashbotsBribe, amountIn };
   }
 
   async executeArbitrageTrade(opportunity, profitability) {
@@ -950,7 +954,9 @@ class MEVBot {
       // Process transactions in parallel with rate limiting
       await Promise.all(pendingBlock.transactions.map(async (txHash) => {
         const tx = await this.provider.getTransaction(txHash);
-        const { pair, isBuy } = isMonitoredTx(tx).monitored;
+        const monitored = isMonitoredTx(tx);
+        if (!monitored) return null;
+        const { pair, isBuy } = monitored;
         if (!pair || !isBuy) return null;
         const quote = pair[1].coin;
         const tradeValue = parseFloat(formatEther(tx.value));
@@ -1095,11 +1101,13 @@ class MEVBot {
 
   // Identify front-running opportunities based on swap size, slippage, and gas price
   async isFrontRunningOpportunity(tx) {
-    const {pair} = isMonitoredTx(tx);
-    if (!pair) {
-      this.logger.info(`Not monitoring TX `, pair, tx.data);
+    const monitored = isMonitoredTx(tx);
+    if (!monitored) {
+      this.logger.info(`Not monitoring TX `, tx.data);
       return null;
     }
+    const { pair } = monitored;
+
     const base = pair[0].coin;
     const tradeValue = parseFloat(formatEther(tx.value));
     // Calculate amountIn based on available balance
@@ -1164,9 +1172,14 @@ class MEVBot {
 
   // Identify back-running opportunities by checking liquidity pool impact and price impact recovery
   async isBackRunningOpportunity(tx) {
+    const monitored = isMonitoredTx(tx);
+    if (!monitored) {
+      this.logger.info(`Not monitoring TX `, tx.data);
+      return null;
+    }
     const {pair, isBuy} = isMonitoredTx(tx);
     if (!pair || isBuy ) {
-      this.logger.info(`Not monitoring TX `, pair, tx.data);
+      this.logger.info(`Not monitoring TX `, pair);
       return;
     }
     const quote = pair[1].coin;
