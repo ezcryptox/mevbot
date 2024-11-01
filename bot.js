@@ -349,8 +349,8 @@ function isMonitoredTx(tx) {
   // Extract the method name and parameters
   const methodName = decodedData.name;
 
-  this.logger.info(`TX Data>: ${decodedData}`)
-
+  console.log('TX DATA > ', decodedData);
+  
   if (methodName.toLowerCase() !== 'swapexacttokensfortokens') return undefined// We only care about token swaps
 
 
