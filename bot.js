@@ -342,6 +342,7 @@ function gasLimitConfig() {
 }
 function isMonitoredTx(tx) {
   // Decode the transaction data
+  if (!tx) return undefined;
   const decodedData = abiDecoder.decodeMethod(tx.data);
 
   if (!decodedData) return undefined;
@@ -349,11 +350,11 @@ function isMonitoredTx(tx) {
   // Extract the method name and parameters
   const methodName = decodedData.name;
 
-  console.log('TX DATA > ', decodedData);
-  
+  console.log('TX Method > ', decodedData.name);
+
   if (methodName.toLowerCase() !== 'swapexacttokensfortokens') return undefined// We only care about token swaps
 
-
+  console.log(`Found  '${methodName}' method`);
 
   const params = decodedData.params;
 
@@ -1177,7 +1178,7 @@ class MEVBot {
       this.logger.info(`Not monitoring TX `, tx.data);
       return null;
     }
-    const {pair, isBuy} = isMonitoredTx(tx);
+    const {pair, isBuy} = monitored;
     if (!pair || isBuy ) {
       this.logger.info(`Not monitoring TX `, pair);
       return;
