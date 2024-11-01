@@ -3,7 +3,7 @@ const { ethers, toBigInt, parseUnits, parseEther, formatEther, MaxUint256, Contr
 const axios = require('axios');
 const winston = require('winston');
 const mongoose = require('mongoose');
-const MevShareClient =  require("@flashbots/mev-share-client")
+const MevShareClient = require("@flashbots/mev-share-client")
 const { Mutex } = require('async-mutex');
 const abiDecoder = require('abi-decoder');
 
@@ -428,7 +428,7 @@ class MEVBot {
     }));
 
     // if (process.env.NODE_ENV !== 'production') {
-      
+
     // }
 
 
@@ -559,11 +559,11 @@ class MEVBot {
     if (!this.validateArbitrageOpportunity(opportunity)) return { isProfit: false };
 
     const { gasCost, slippage, exchangeFees, potentialProfit, amountIn } = await this.estimateTradeMetrics(opportunity);
-    if (amountIn) return {isProfit: false}
+    if (amountIn) return { isProfit: false }
     const minProfitThreshold = ARBITRAGE_THRESHOLDS[opportunity.coin] || 0.1; // Allow dynamic adjustment
 
     const netProfit = potentialProfit - gasCost - exchangeFees;
-    const profitRatio = !gasCost ? 0 : (netProfit * parseUnits('1', '18')/ gasCost) / 1e18;
+    const profitRatio = !gasCost ? 0 : (netProfit * parseUnits('1', '18') / gasCost) / 1e18;
 
     return {
       isProfit: netProfit > parseEther(minProfitThreshold.toString()) && profitRatio > 1.5,
@@ -676,7 +676,7 @@ class MEVBot {
       // 'Authorization': `Bearer ${process.env.COINGECKO_API_KEY}`
     };
     try {
-      
+
       const response = await axios.get(ep, { headers });
       const { [pair[0].coin.toLowerCase()]: externalPrice } = response.data[pair[1].coin.toLowerCase()];
       if (!externalPrice) throw new Error('Invalid price data');
@@ -737,7 +737,7 @@ class MEVBot {
     // Calculate amountIn based on available balance and potential profit
     const balance = await this.getBalance(pair[0].address);
     if (!balance) return { amountIn: 0 }
-    
+
     this.logger.info(`ETH BALANCE: ${balance}`)
     const maxPercentage = parseFloat(process.env.MAX_BUY_PERCENTAGE || '50'); // Maximum percentage of balance to use
     const basePercentage = parseFloat(process.env.BASE_BUY_PERCENTAGE || '10');
@@ -932,7 +932,7 @@ class MEVBot {
       }
 
 
-      const { frontTxData, amountsOut} = await this.createFrontTx(targetTx);
+      const { frontTxData, amountsOut } = await this.createFrontTx(targetTx);
       const backTx = await this.createBackTx(targetTx, amountsOut);
 
       const bundle = [frontTxData, targetTx.originalTx, backTx]
@@ -951,7 +951,7 @@ class MEVBot {
       if (!pendingBlock || !pendingBlock.transactions) return null;
 
       const targetTxs = [];
-      
+
       // Process transactions in parallel with rate limiting
       await Promise.all(pendingBlock.transactions.map(async (txHash) => {
         const tx = await this.provider.getTransaction(txHash);
@@ -965,14 +965,14 @@ class MEVBot {
         const balance = await this.getBalance(pair[0].address);
 
         if (!balance) {
-          this.logger.info(`Insufficient Funds`);
+          this.logger.info(`Insufficient Funds > ${balance} ${pair[0].coin}`);
           return null;
         }
         const basePercentage = parseInt(process.env.BASE_BUY_PERCENTAGE || '10');
 
         let amountIn = tradeValue * basePercentage / 100;
         if (amountIn > balance) {
-          this.logger.info(`Insufficient Funds`);
+          this.logger.info(`Insufficient Funds > ${balance} ${pair[0].coin} TO Spend: ${amountIn}`);
           return null;
         }
 
@@ -981,12 +981,25 @@ class MEVBot {
 
         for (const dexKey in DEXs) {
           const dex = DEXs[dexKey];
-          if (tx.to.toLowerCase() !== dex.routerAddress.toLowerCase() || !pair) continue; //
+          if (tx.to.toLowerCase() !== dex.routerAddress.toLowerCase() || !pair) {
+            this.logger.info(`Transaction isn't on monitored DEXs > ${tx.to}`);
+            continue; // 
+          }
+
 
           if (tradeValue > (LARGE_TRADE_THRESHOLDS[pair[0].coin] || 1)) {
             this.logger.info(`Identified large trade for sandwiching on ${dex.name} for ${quote}: ${tradeValue} ${pair[0].coin}`);
             targetTxs.push({ tx, dex, pair, tradeValue, originalTx: tx, amountIn });
+          } else {
+            this.logger.info(`Transaction did'nt meet Sandwich target requirements > ${{
+              tradeValue: {
+                current: tradeValue,
+                mustBe_GT: LARGE_TRADE_THRESHOLDS[base] || 1
+              },
+            }}`);
           }
+
+          break;
         }
       }));
 
@@ -1023,7 +1036,7 @@ class MEVBot {
       }
     );
 
-    return { frontTxData, amountsOut};
+    return { frontTxData, amountsOut };
   }
 
   async createBackTx(targetTx, amountsOut) {
@@ -1119,7 +1132,7 @@ class MEVBot {
     const balance = await this.getBalance(pair[0].address);
 
     if (!balance) {
-      this.logger.info(`Insufficient Funds`,);
+      this.logger.info(`Insufficient Funds > ${balance} ${base}`);
       return null;
     }
     const basePercentage = parseInt(process.env.BASE_BUY_PERCENTAGE || '10');
@@ -1129,10 +1142,13 @@ class MEVBot {
 
     for (const dexKey in DEXs) {
       const dex = DEXs[dexKey];
-      if (tx.to.toLowerCase() !== dex.routerAddress.toLowerCase()) continue; // 
+      if (tx.to.toLowerCase() !== dex.routerAddress.toLowerCase()) {
+        this.logger.info(`Transaction isn't on monitored DEXs > ${tx.to}`);
+        continue; // 
+      }
 
 
-      
+
 
       // Front-running criteria:
       // 1. Large trade value above threshold
@@ -1149,6 +1165,21 @@ class MEVBot {
       ) {
         this.logger.info(`Identified front-running opportunity on ${dex.name} for ${pair[1].coin}: ${tradeValue} ${base}`);
         return { dex, pair, amountIn };
+      } else {
+        this.logger.info(`Transaction didnt meet Front-Running requirements > ${{
+          tradeValue: {
+            current: tradeValue,
+            mustBe_GT: LARGE_TRADE_THRESHOLDS[base] || 1
+          },
+          slippage: {
+            current: slippage,
+            mustBe_GT: 1
+          },
+          gasPrice: {
+            current: gasPrice,
+            mustBe_LT: parseUnits('200', 'gwei')
+          }
+        }}`);
       }
       break;
     }
@@ -1182,8 +1213,8 @@ class MEVBot {
       this.logger.info(`Not monitoring TX `, tx.data);
       return null;
     }
-    const {pair, isBuy} = monitored;
-    if (!pair || isBuy ) {
+    const { pair, isBuy } = monitored;
+    if (!pair || isBuy) {
       this.logger.info(`Not monitoring COIN PAIR `, pair);
       return;
     }
@@ -1205,8 +1236,12 @@ class MEVBot {
 
     for (const dexKey in DEXs) {
       const dex = DEXs[dexKey];
-      if (tx.to.toLowerCase() !== dex.routerAddress.toLowerCase()) continue; // 
-     
+      if (tx.to.toLowerCase() !== dex.routerAddress.toLowerCase()) {
+        this.logger.info(`Transaction isn't on monitored DEXs > ${tx.to}`);
+        continue; // 
+      }
+
+
 
       // Back-running criteria:
       // 1. Large trade size impacting liquidity
@@ -1218,6 +1253,17 @@ class MEVBot {
       if (tradeValue > (LARGE_TRADE_THRESHOLDS[quote] || 1) && priceImpact > 5) {
         this.logger.info(`Identified back-running opportunity on ${dex.name} for ${quote}: ${tradeValue} ${quote}`);
         return { dex, pair, amountsOut };
+      } else {
+        this.logger.info(`Transaction did'nt meet Back-Running requirements > ${{
+          tradeValue: {
+            current: tradeValue,
+            mustBe_GT: LARGE_TRADE_THRESHOLDS[quote] || 1
+          },
+          priceImpact: {
+            current: priceImpact,
+            mustBe_GT: 5
+          },
+        }}`);
       }
       break;
     }
