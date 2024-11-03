@@ -8,20 +8,160 @@ const { Mutex } = require('async-mutex');
 const abiDecoder = require('abi-decoder');
 
 // Constants
-const MONITORED_PAIRS = [[{
-  coin: 'ETH', // WETH
-  address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
-}, {
-  coin: 'AAVE',
-  address: getAddress('0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9')
-}
-], [{
-  coin: 'ETH',
-  address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
-}, {
-  coin: 'DAI',
-  address: getAddress('0x6B175474E89094C44Da98b954EedeAC495271d0F')
-}]];
+const MONITORED_PAIRS = [
+  [
+    {
+      coin: 'ETH', // WETH
+      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+    },
+    {
+      coin: 'AAVE',
+      address: getAddress('0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9')
+    }
+  ],
+  [
+    {
+      coin: 'ETH',
+      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+    },
+    {
+      coin: 'DAI',
+      address: getAddress('0x6B175474E89094C44Da98b954EedeAC495271d0F')
+    }
+  ],
+  // Additional pairs
+  [
+    {
+      coin: 'ETH',
+      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+    },
+    {
+      coin: 'USDC',
+      address: getAddress('0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48')
+    }
+  ],
+  [
+    {
+      coin: 'ETH',
+      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+    },
+    {
+      coin: 'USDT',
+      address: getAddress('0xdac17f958d2ee523a2206206994597c13d831ec7')
+    }
+  ],
+  [
+    {
+      coin: 'ETH',
+      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+    },
+    {
+      coin: 'UNI',
+      address: getAddress('0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984')
+    }
+  ],
+  [
+    {
+      coin: 'ETH',
+      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+    },
+    {
+      coin: 'SUSHI',
+      address: getAddress('0x6B3595068778DD592e39A122f4f5a5CF09C90fE2')
+    }
+  ],
+  [
+    {
+      coin: 'ETH',
+      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+    },
+    {
+      coin: 'LINK',
+      address: getAddress('0x514910771AF9Ca656af840dff83E8264EcF986CA')
+    }
+  ],
+  [
+    {
+      coin: 'ETH',
+      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+    },
+    {
+      coin: 'WBTC',
+      address: getAddress('0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599')
+    }
+  ],
+  [
+    {
+      coin: 'USDC',
+      address: getAddress('0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48')
+    },
+    {
+      coin: 'USDT',
+      address: getAddress('0xdac17f958d2ee523a2206206994597c13d831ec7')
+    }
+  ],
+  [
+    {
+      coin: 'DAI',
+      address: getAddress('0x6B175474E89094C44Da98b954EedeAC495271d0F')
+    },
+    {
+      coin: 'USDC',
+      address: getAddress('0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48')
+    }
+  ],
+  [
+    {
+      coin: 'MATIC',
+      address: getAddress('0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0')
+    },
+    {
+      coin: 'USDC',
+      address: getAddress('0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48')
+    }
+  ],
+  [
+    {
+      coin: 'COMP',
+      address: getAddress('0xc00e94cb662c3520282e6f5717214004a7f26888')
+    },
+    {
+      coin: 'ETH',
+      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+    }
+  ],
+  [
+    {
+      coin: 'YFI',
+      address: getAddress('0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e')
+    },
+    {
+      coin: 'ETH',
+      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+    }
+  ],
+  [
+    {
+      coin: 'SNX',
+      address: getAddress('0xC011A72400E58ecD99Ee497CF89E3775d4bd732F')
+    },
+    {
+      coin: 'ETH',
+      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+    }
+  ],
+  [
+    {
+      coin: 'MKR',
+      address: getAddress('0x9f8F72aA9304c8B593d555F12ef6589cC3A579A2')
+    },
+    {
+      coin: 'ETH',
+      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+    }
+  ]
+];
+
 
 const SLIPPAGE_TOLERANCE = { DAI: 0.0001, AAVE: 0.001 };
 const ARBITRAGE_THRESHOLDS = { DAI: 0.001, AAVE: 0.001 };
