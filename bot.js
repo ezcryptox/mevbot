@@ -37,7 +37,7 @@ const MONITORED_PAIRS = [
     },
     {
       coin: 'USDC',
-      address: getAddress('0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48')
+      address: '0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
     }
   ],
   [
@@ -47,7 +47,7 @@ const MONITORED_PAIRS = [
     },
     {
       coin: 'USDT',
-      address: getAddress('0xdac17f958d2ee523a2206206994597c13d831ec7')
+      address: '0xdac17f958d2ee523a2206206994597c13d831ec7'
     }
   ],
   [
@@ -93,11 +93,11 @@ const MONITORED_PAIRS = [
   [
     {
       coin: 'USDC',
-      address: getAddress('0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48')
+      address: '0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
     },
     {
       coin: 'USDT',
-      address: getAddress('0xdac17f958d2ee523a2206206994597c13d831ec7')
+      address: '0xdac17f958d2ee523a2206206994597c13d831ec7'
     }
   ],
   [
@@ -107,7 +107,7 @@ const MONITORED_PAIRS = [
     },
     {
       coin: 'USDC',
-      address: getAddress('0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48')
+      address: '0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
     }
   ],
   [
@@ -117,7 +117,7 @@ const MONITORED_PAIRS = [
     },
     {
       coin: 'USDC',
-      address: getAddress('0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48')
+      address: '0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
     }
   ],
   [
