@@ -868,7 +868,7 @@ class MEVBot {
     this.logger.info(`${dex.name} :::> Getting Amounts for ${parseEther('1')}, => ${tokenIn.coin} : ${tokenOut.coin}`)
     try {
       const amounts = await router.getAmountsOut(parseEther('1'), [tokenIn.address, tokenOut.address]);
-      this.logger.info(`${dex.name} :::> Amounts => ${amounts}, OUT:> ${parseFloat(formatEther(amounts[1])) }`);
+      this.logger.info(`${dex.name} :::> Amounts => ${amounts}, OUT:> ${formatEther(amounts[1])}`);
       return parseFloat(formatEther(amounts[1]));
     } catch (error) {
       this.logger.error(`${dex.name} :::> Error fetching prices for pair: ${tokenIn.coin}<=>${tokenOut.coin} : Reason: =====> ${error.message}`);
