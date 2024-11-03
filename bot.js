@@ -12,28 +12,28 @@ const MONITORED_PAIRS = [
   [
     {
       coin: 'ETH', // WETH
-      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+      address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
     },
     {
       coin: 'AAVE',
-      address: getAddress('0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9')
+      address: '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9'
     }
   ],
   [
     {
       coin: 'ETH',
-      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+      address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
     },
     {
       coin: 'DAI',
-      address: getAddress('0x6B175474E89094C44Da98b954EedeAC495271d0F')
+      address: '0x6B175474E89094C44Da98b954EedeAC495271d0F'
     }
   ],
   // Additional pairs
   [
     {
       coin: 'ETH',
-      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+      address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
     },
     {
       coin: 'USDC',
@@ -43,7 +43,7 @@ const MONITORED_PAIRS = [
   [
     {
       coin: 'ETH',
-      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+      address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
     },
     {
       coin: 'USDT',
@@ -53,7 +53,7 @@ const MONITORED_PAIRS = [
   [
     {
       coin: 'ETH',
-      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+      address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
     },
     {
       coin: 'UNI',
@@ -63,7 +63,7 @@ const MONITORED_PAIRS = [
   [
     {
       coin: 'ETH',
-      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+      address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
     },
     {
       coin: 'SUSHI',
@@ -73,21 +73,21 @@ const MONITORED_PAIRS = [
   [
     {
       coin: 'ETH',
-      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+      address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
     },
     {
       coin: 'LINK',
-      address: getAddress('0x514910771AF9Ca656af840dff83E8264EcF986CA')
+      address: '0x514910771AF9Ca656af840dff83E8264EcF986CA'
     }
   ],
   [
     {
       coin: 'ETH',
-      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+      address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
     },
     {
       coin: 'WBTC',
-      address: getAddress('0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599')
+      address: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599'
     }
   ],
   [
@@ -103,7 +103,7 @@ const MONITORED_PAIRS = [
   [
     {
       coin: 'DAI',
-      address: getAddress('0x6B175474E89094C44Da98b954EedeAC495271d0F')
+      address: '0x6B175474E89094C44Da98b954EedeAC495271d0F'
     },
     {
       coin: 'USDC',
@@ -113,7 +113,7 @@ const MONITORED_PAIRS = [
   [
     {
       coin: 'MATIC',
-      address: getAddress('0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0')
+      address: '0x7D1AfA7B718fb893dB30A3aBc0Cfc608AaCfeBB0'
     },
     {
       coin: 'USDC',
@@ -123,11 +123,11 @@ const MONITORED_PAIRS = [
   [
     {
       coin: 'COMP',
-      address: getAddress('0xc00e94cb662c3520282e6f5717214004a7f26888')
+      address: '0xc00e94Cb662C3520282E6f5717214004A7f26888'
     },
     {
       coin: 'ETH',
-      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+      address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
     }
   ],
   [
@@ -137,7 +137,7 @@ const MONITORED_PAIRS = [
     },
     {
       coin: 'ETH',
-      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+      address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
     }
   ],
   [
@@ -147,7 +147,7 @@ const MONITORED_PAIRS = [
     },
     {
       coin: 'ETH',
-      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+      address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
     }
   ],
   [
@@ -157,7 +157,7 @@ const MONITORED_PAIRS = [
     },
     {
       coin: 'ETH',
-      address: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+      address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
     }
   ]
 ];
@@ -330,14 +330,14 @@ const BOT_STRATEGIES = ['ARBITRAGE', 'FRONT_RUNNING', 'BACK_RUNNING', 'SANDWICH'
 const DEXs = {
   UNISWAP: {
     name: 'Uniswap',
-    factoryAddress: getAddress('0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f'),
+    factoryAddress: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
     routerAddress: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
     tradingFeePercentage: 0.3
   },
   SUSHISWAP: {
     name: 'Sushiswap',
-    factoryAddress: '0xC0AEe478e3658e2610c5F7A4A2E1777Ce9e4f2Ac',
-    routerAddress: getAddress('0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f'),
+    factoryAddress: '0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac',
+    routerAddress: '0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F',
     tradingFeePercentage: 0.3
   }
 };
