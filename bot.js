@@ -37,7 +37,7 @@ const MONITORED_PAIRS = [
     },
     {
       coin: 'USDC',
-      address: '0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
+      address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
     }
   ],
   [
@@ -57,7 +57,7 @@ const MONITORED_PAIRS = [
     },
     {
       coin: 'UNI',
-      address: getAddress('0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984')
+      address: '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984'
     }
   ],
   [
@@ -67,7 +67,7 @@ const MONITORED_PAIRS = [
     },
     {
       coin: 'SUSHI',
-      address: '0x6B3595068778DD592e39A122f4f5a5CF09C90fE2'
+      address: '0x6B3595068778DD592e39A122f4f5a5cF09C90fE2'
     }
   ],
   [
@@ -93,7 +93,7 @@ const MONITORED_PAIRS = [
   [
     {
       coin: 'USDC',
-      address: '0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
+      address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
     },
     {
       coin: 'USDT',
@@ -107,7 +107,7 @@ const MONITORED_PAIRS = [
     },
     {
       coin: 'USDC',
-      address: '0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
+      address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
     }
   ],
   [
@@ -117,7 +117,7 @@ const MONITORED_PAIRS = [
     },
     {
       coin: 'USDC',
-      address: '0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
+      address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
     }
   ],
   [
@@ -133,7 +133,7 @@ const MONITORED_PAIRS = [
   [
     {
       coin: 'YFI',
-      address: getAddress('0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e')
+      address: '0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e'
     },
     {
       coin: 'ETH',
@@ -143,7 +143,7 @@ const MONITORED_PAIRS = [
   [
     {
       coin: 'SNX',
-      address: getAddress('0xC011A72400E58ecD99Ee497CF89E3775d4bd732F')
+      address: '0xC011A72400E58ecD99Ee497CF89E3775d4bd732F'
     },
     {
       coin: 'ETH',
@@ -153,7 +153,7 @@ const MONITORED_PAIRS = [
   [
     {
       coin: 'MKR',
-      address: '0x9f8F72aA9304c8B593d555F12ef6589cC3A579A2'
+      address: '0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2'
     },
     {
       coin: 'ETH',
@@ -505,6 +505,8 @@ function isMonitoredTx(tx) {
       tokenAddresses = tokenAddresses.concat(param.value);
     }
   });
+
+  console.log('Token Addresses > ', tokenAddresses);
 
   tokenAddresses = [...new Set(tokenAddresses.map(addr => addr.toLowerCase()))];
 
