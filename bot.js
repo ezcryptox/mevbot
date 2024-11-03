@@ -163,8 +163,39 @@ const MONITORED_PAIRS = [
 ];
 
 
-const SLIPPAGE_TOLERANCE = { DAI: 0.0001, AAVE: 0.001 };
-const ARBITRAGE_THRESHOLDS = { DAI: 0.001, AAVE: 0.001 };
+const SLIPPAGE_TOLERANCE = {
+  DAI: 0.0001,
+  AAVE: 0.001,
+  ETH: 0.001,
+  USDC: 0.0005,
+  USDT: 0.0005,
+  UNI: 0.001,
+  SUSHI: 0.001,
+  LINK: 0.001,
+  WBTC: 0.001,
+  MATIC: 0.001,
+  COMP: 0.001,
+  YFI: 0.001,
+  SNX: 0.001,
+  MKR: 0.001
+};
+
+const ARBITRAGE_THRESHOLDS = {
+  DAI: 0.001,
+  AAVE: 0.001,
+  ETH: 0.001,
+  USDC: 0.001,
+  USDT: 0.001,
+  UNI: 0.001,
+  SUSHI: 0.001,
+  LINK: 0.001,
+  WBTC: 0.001,
+  MATIC: 0.001,
+  COMP: 0.001,
+  YFI: 0.001,
+  SNX: 0.001,
+  MKR: 0.001
+};
 
 const ERC20_ABI = [
   "function name() view returns (string)",
@@ -766,21 +797,19 @@ class MEVBot {
       // Fetch prices in parallel
       await Promise.all(Object.keys(DEXs).map(async (dexKey) => {
         const dex = DEXs[dexKey];
-        try {
-          const price = await this.getPriceFromDEX(dex.routerAddress, pair[0].address, pair[1].address);
-          dexPrices[dexKey] = price;
-        } catch (error) {
-          this.logger.error(`Error fetching price from ${dex.name} for ${coin}:`, error);
-        }
+        const price = await this.getPriceFromDEX(dex, pair[0], pair[1]);
+        dexPrices[dexKey] = price;
       }));
 
       const dexNames = Object.keys(dexPrices);
       for (let i = 0; i < dexNames.length; i++) {
+        const dex1 = dexNames[i];
+        const price1 = dexPrices[dex1];
+        if (!price1) continue;
         for (let j = i + 1; j < dexNames.length; j++) {
-          const dex1 = dexNames[i];
           const dex2 = dexNames[j];
-          const price1 = dexPrices[dex1];
           const price2 = dexPrices[dex2];
+          if (!price2) continue;
           if (price1 > price2 * (1 + threshold)) {
             opportunities.push({
               strategy: 'ARBITRAGE',
@@ -820,11 +849,13 @@ class MEVBot {
     try {
 
       const response = await axios.get(ep, { headers });
-      const { [pair[0].coin.toLowerCase()]: externalPrice } = response.data[pair[1].coin.toLowerCase()];
+      const data = response.data[pair[1].coin.toLowerCase()];
+       if (!data) throw new Error('Invalid response data');
+      const { [pair[0].coin.toLowerCase()]: externalPrice } = data;
       if (!externalPrice) throw new Error('Invalid price data');
 
       // Compare external price with DEX price to validate opportunity
-      const dexPrice = await this.getPriceFromDEX(DEXs[buyDex].routerAddress, pair[1].address, pair[0].address);
+      const dexPrice = await this.getPriceFromDEX(DEXs[buyDex], pair[1], pair[0]);
       return dexPrice * (1 + ARBITRAGE_THRESHOLDS[pair[1].coin.toLowerCase()]) < externalPrice;
     } catch (error) {
       this.logger.error(`Error validating arbitrage opportunity: ERROR MESSAGE =>"${error.message}" for endpoint :::> ${ep}`);
@@ -832,12 +863,17 @@ class MEVBot {
     }
   }
 
-  async getPriceFromDEX(routerAddress, tokenIn, tokenOut) {
-    const router = new ethers.Contract(routerAddress, DEX_ABI, this.provider);
-    this.logger.info(`${routerAddress} :::> Getting Amounts for ${parseEther('1')}, => ${tokenIn} : ${tokenOut}`,)
-    const amounts = await router.getAmountsOut(parseEther('1'), [tokenIn, tokenOut]);
-    this.logger.info(`Amounts => ${amounts}`)
-    return parseFloat(formatEther(amounts[1]));
+  async getPriceFromDEX(dex, tokenIn, tokenOut) {
+    const router = new ethers.Contract(dex.routerAddress, DEX_ABI, this.provider);
+    this.logger.info(`${dex.name} :::> Getting Amounts for ${parseEther('1')}, => ${tokenIn.coin} : ${tokenOut.coin}`)
+    try {
+      const amounts = await router.getAmountsOut(parseEther('1'), [tokenIn.address, tokenOut.address]);
+      this.logger.info(`${dex.name} :::> Amounts => ${amounts}, OUT:> ${parseFloat(formatEther(amounts[1])) }`);
+      return parseFloat(formatEther(amounts[1]));
+    } catch (error) {
+      this.logger.error(`${dex.name} :::> Error fetching prices for pair: ${tokenIn.coin}<=>${tokenOut.coin} : Reason: =====> ${error.message}`);
+      return 0;
+    }
   }
 
   async executeArbitrage(opportunities) {
