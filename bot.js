@@ -153,7 +153,7 @@ const MONITORED_PAIRS = [
   [
     {
       coin: 'MKR',
-      address: getAddress('0x9f8F72aA9304c8B593d555F12ef6589cC3A579A2')
+      address: '0x9f8F72aA9304c8B593d555F12ef6589cC3A579A2'
     },
     {
       coin: 'ETH',
