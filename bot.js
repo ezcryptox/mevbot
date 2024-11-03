@@ -67,7 +67,7 @@ const MONITORED_PAIRS = [
     },
     {
       coin: 'SUSHI',
-      address: getAddress('0x6B3595068778DD592e39A122f4f5a5CF09C90fE2')
+      address: '0x6B3595068778DD592e39A122f4f5a5CF09C90fE2'
     }
   ],
   [
